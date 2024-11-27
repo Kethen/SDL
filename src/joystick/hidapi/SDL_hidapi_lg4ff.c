@@ -219,6 +219,8 @@ static void HIDAPI_DriverLg4ff_HandleState(SDL_HIDAPI_Device *device,
         SDL_PrivateJoystickHat(joystick, 0, sdl_hat);
     }
 
+
+
 }
 
 static SDL_bool HIDAPI_DriverLg4ff_UpdateDevice(SDL_HIDAPI_Device *device)
@@ -262,12 +264,28 @@ static SDL_bool HIDAPI_DriverLg4ff_UpdateDevice(SDL_HIDAPI_Device *device)
             HIDAPI_JoystickDisconnected(device, device->joysticks[0]);
             return SDL_FALSE;
         } else if (r == report_size) {
-            HIDAPI_DriverSteamDeck_HandleState(device, joystick, report_buf);
+            HIDAPI_DriverLg4ff_HandleState(device, joystick, report_buf);
         }
     } while (r > 0);
 
     return SDL_TRUE;
 }
+
+static SDL_bool HIDAPI_DriverLg4ff_OpenJoystick(SDL_HIDAPI_Device *device, SDL_Joystick *joystick)
+{
+    SDL_AssertJoysticksLocked();
+
+    // Initialize the joystick capabilities
+    joystick->nhats = 1;
+    joystick->nbuttons = 20;
+    joystick->naxes = SDL_CONTROLLER_AXIS_MAX;
+
+    SDL_PrivateJoystickAddSensor(joystick, SDL_SENSOR_GYRO, update_rate_in_hz);
+    SDL_PrivateJoystickAddSensor(joystick, SDL_SENSOR_ACCEL, update_rate_in_hz);
+
+    return SDL_TRUE;
+}
+
 /*
   XXX
 
