@@ -42,16 +42,16 @@
 #define USB_DEVICE_ID_LOGITECH_WHEEL 0xc294
 
 static Uint32 supported_device_ids[] = {
-	USB_DEVICE_ID_LOGITECH_G29_WHEEL,
-	USB_DEVICE_ID_LOGITECH_G27_WHEEL,
-	USB_DEVICE_ID_LOGITECH_G25_WHEEL,
-	USB_DEVICE_ID_LOGITECH_DFGT_WHEEL,
-	USB_DEVICE_ID_LOGITECH_DFP_WHEEL,
-	USB_DEVICE_ID_LOGITECH_WHEEL
+    USB_DEVICE_ID_LOGITECH_G29_WHEEL,
+    USB_DEVICE_ID_LOGITECH_G27_WHEEL,
+    USB_DEVICE_ID_LOGITECH_G25_WHEEL,
+    USB_DEVICE_ID_LOGITECH_DFGT_WHEEL,
+    USB_DEVICE_ID_LOGITECH_DFP_WHEEL,
+    USB_DEVICE_ID_LOGITECH_WHEEL
 };
 
 // keep the same order as the supported_ids array
-static const char* supported_device_names[] = {
+static const char *supported_device_names[] = {
     "Logitech G29",
     "Logitech G27",
     "Logitech G25",
@@ -60,7 +60,8 @@ static const char* supported_device_names[] = {
     "Driving Force EX"
 };
 
-static get_device_name(Uint32 device_id){
+static const char *HIDAPI_DriverLg4ff_GetDeviceName(Uint32 device_id)
+{
     for (int i = 0;i < (sizeof supported_device_ids) / sizeof(Uint32);i++) {
         if (supported_device_ids[i] == device_id) {
             return supported_device_names[i];
@@ -68,6 +69,27 @@ static get_device_name(Uint32 device_id){
     }
     SDL_assert(0);
     return "";
+}
+
+static int HIDAPI_DriverLg4ff_GetNumberOfButtons(Uint32 device_id)
+{
+    switch (device_id) {
+        case USB_DEVICE_ID_LOGITECH_G29_WHEEL:
+            return 25;
+        case USB_DEVICE_ID_LOGITECH_G27_WHEEL:
+            return 22;
+        case USB_DEVICE_ID_LOGITECH_G25_WHEEL:
+            return 19;
+        case USB_DEVICE_ID_LOGITECH_DFGT_WHEEL:
+            return 21;
+        case USB_DEVICE_ID_LOGITECH_DFP_WHEEL:
+            return 14;
+        case USB_DEVICE_ID_LOGITECH_WHEEL:
+            return 13;
+        default:
+            SDL_assert(0);
+            return 0;
+    }
 }
 
 typedef struct
@@ -117,7 +139,7 @@ static SDL_bool HIDAPI_DriverLg4ff_IsSupportedDevice(
     if (product_id != USB_VENDOR_ID_LOGITECH) {
         return SDL_FALSE;
     }
-    for (i = 0;i < sizeof(supported_device_ids) / sizeof(Uint32);i++) {
+    for (int i = 0;i < sizeof(supported_device_ids) / sizeof(Uint32);i++) {
         if (supported_device_ids[i] == vendor_id) {
             return SDL_TRUE;
         }
@@ -125,22 +147,206 @@ static SDL_bool HIDAPI_DriverLg4ff_IsSupportedDevice(
     return SDL_FALSE;
 }
 
+static SDL_bool HIDAPI_DriverLg4ff_SetRange(SDL_HIDAPI_Device *device, int range)
+{
+    Uint8 cmd[7] = {0};
+    int ret = 0;
+
+    if(range < 40){
+        range = 40;
+    }
+    if(range > 900){
+        range = 900;
+    }
+    
+    switch (device->product_id) {
+        case USB_DEVICE_ID_LOGITECH_G29_WHEEL:
+        case USB_DEVICE_ID_LOGITECH_G27_WHEEL:
+        case USB_DEVICE_ID_LOGITECH_G25_WHEEL:
+        case USB_DEVICE_ID_LOGITECH_DFGT_WHEEL:{
+            cmd[0] = 0xf8;
+            cmd[1] = 0x81;
+            cmd[2] = range & 0x00ff;
+            cmd[3] = (range & 0xff00) >> 8;
+            ret = SDL_hid_send_feature_report(device->dev, cmd, sizeof(cmd));
+            if (ret == -1) {
+                return SDL_FALSE;
+            }
+            break;
+        }
+        case USB_DEVICE_ID_LOGITECH_DFP_WHEEL:{
+            int start_left, start_right, full_range;
+
+            /* Prepare "coarse" limit command */
+            cmd[0] = 0xf8;
+            cmd[1] = 0x00;    /* Set later */
+            cmd[2] = 0x00;
+            cmd[3] = 0x00;
+            cmd[4] = 0x00;
+            cmd[5] = 0x00;
+            cmd[6] = 0x00;
+
+            if (range > 200) {
+                cmd[1] = 0x03;
+                full_range = 900;
+            } else {
+                cmd[1] = 0x02;
+                full_range = 200;
+            }
+            ret = SDL_hid_send_feature_report(device->dev, cmd, 7);
+            if(ret == -1){
+                return SDL_FALSE;
+            }
+
+            /* Prepare "fine" limit command */
+            cmd[0] = 0x81;
+            cmd[1] = 0x0b;
+            cmd[2] = 0x00;
+            cmd[3] = 0x00;
+            cmd[4] = 0x00;
+            cmd[5] = 0x00;
+            cmd[6] = 0x00;
+
+            if (range != 200 && range != 900) {
+                /* Construct fine limit command */
+                start_left = (((full_range - range + 1) * 2047) / full_range);
+                start_right = 0xfff - start_left;
+
+                cmd[2] = start_left >> 4;
+                cmd[3] = start_right >> 4;
+                cmd[4] = 0xff;
+                cmd[5] = (start_right & 0xe) << 4 | (start_left & 0xe);
+                cmd[6] = 0xff;
+            }
+
+            ret = SDL_hid_send_feature_report(device->dev, cmd, 7);
+            if (ret == -1) {
+                return SDL_FALSE;
+            }
+            break;
+        }
+        case USB_DEVICE_ID_LOGITECH_WHEEL:
+            // no range setting for ffex/dfex
+            break;
+        default:
+            SDL_assert(0);
+    }
+
+    return SDL_TRUE;
+}
+
+static SDL_bool HIDAPI_DriverLg4ff_SetAutoCenter(SDL_HIDAPI_Device *device, int gain)
+{
+    /*
+    XXX
+
+    Once again the Linux driver checks between ffex and dfex on the usb
+    stack, not sure how one can check for that on hid.
+    */
+    Uint8 cmd[7] = {0};
+    int ret;
+
+    if(gain < 0){
+        gain = 0;
+    }
+    if(gain > 65535){
+        gain = 65535;
+    }
+
+#if 0
+    if(is_ffex){
+        gain = gain * 90 / 65535;
+
+        cmd[0] = 0xfe;
+        cmd[1] = 0x03;
+        cmd[2] = (uint16_t)gain >> 14;
+        cmd[3] = (uint16_t)gain >> 14;
+        cmd[4] = (uint16_t)gain;
+        cmd[5] = 0x00;
+        cmd[6] = 0x00;
+
+        ret = SDL_hid_send_feature_report(device->dev, cmd, sizeof(cmd));
+        if(ret == -1){
+            return SDL_FALSE;
+        }
+    }else
+#endif
+    {
+        Uint32 expand_a;
+        Uint32 expand_b;
+        // first disable
+        cmd[0] = 0xf5;
+
+        ret = SDL_hid_send_feature_report(device->dev, cmd, sizeof(cmd));
+        if(ret == -1){
+            return SDL_FALSE;
+        }
+
+        if(gain == 0){
+            return SDL_TRUE;
+        }
+
+        // set strength
+
+        if(gain <= 0xaaaa){
+            expand_a = 0x0c * gain;
+            expand_b = 0x80 * gain;
+        }else{
+            expand_a = (0x0c * 0xaaaa) + 0x06 * (gain - 0xaaaa);
+            expand_b = (0x80 * 0xaaaa) + 0xff * (gain - 0xaaaa);
+        }
+        expand_a = expand_a >> 1;
+
+        SDL_memset(cmd, 0x00, 7);
+        cmd[0] = 0xfe;
+        cmd[1] = 0x0d;
+        cmd[2] = expand_a / 0xaaaa;
+        cmd[3] = expand_a / 0xaaaa;
+        cmd[4] = expand_b / 0xaaaa;
+
+        ret = SDL_hid_send_feature_report(device->dev, cmd, sizeof(cmd));
+        if(ret == -1){
+            return SDL_FALSE;
+        }
+
+        // enable
+        SDL_memset(cmd, 0x00, 7);
+        cmd[0] = 0x14;
+
+        ret = SDL_hid_send_feature_report(device->dev, cmd, sizeof(cmd));
+        if(ret == -1){
+            return SDL_FALSE;
+        }
+    }
+    return SDL_TRUE;
+}
+
 static SDL_bool HIDAPI_DriverLg4ff_InitDevice(SDL_HIDAPI_Device *device)
 {
-    SDL_DriverSteamDeck_Context *ctx;
+    SDL_DriverLg4ff_Context *ctx;
 
-    ctx = (SDL_DriverSteamDeck_Context *)SDL_calloc(1, sizeof(SDL_DriverSteamDeck_Context));
+    ctx = (SDL_DriverLg4ff_Context *)SDL_calloc(1, sizeof(SDL_DriverLg4ff_Context));
     if (ctx == NULL) {
         SDL_OutOfMemory();
         return SDL_FALSE;
     }
-    SDL_memset(ctx, 0, sizeof(SDL_DriverSteamDeck_Context));
+    SDL_memset(ctx, 0, sizeof(SDL_DriverLg4ff_Context));
 
     device->context = ctx;
+    device->joystick_type = SDL_JOYSTICK_TYPE_WHEEL;
 
-    HIDAPI_SetDeviceName(device, get_device_name(device->product_id));
+    HIDAPI_SetDeviceName(device, HIDAPI_DriverLg4ff_GetDeviceName(device->product_id));
 
-    if (SDL_hid_set_nonblocking(device, 1) != 0) {
+    if (SDL_hid_set_nonblocking(device->dev, 1) != 0) {
+        return SDL_FALSE;
+    }
+
+    // XXX should an env be available to change these?
+    if (!HIDAPI_DriverLg4ff_SetRange(device, 900)) {
+        return SDL_FALSE;
+    }
+
+    if (!HIDAPI_DriverLg4ff_SetAutoCenter(device, 0)) {
         return SDL_FALSE;
     }
 
@@ -156,14 +362,28 @@ static void HIDAPI_DriverLg4ff_SetDevicePlayerIndex(SDL_HIDAPI_Device *device, S
 {
 }
 
+
+static SDL_bool HIDAPI_DriverLg4ff_GetBit(const Uint8 *buf, int bit_num, int buf_len)
+{
+    int byte_offset = bit_num / 8;
+    int local_bit = bit_num % 8;
+    Uint8 mask = 1 << local_bit;
+    if(byte_offset >= buf_len){
+        SDL_assert(0);
+    }
+    return (buf[byte_offset] & mask) ? SDL_TRUE : SDL_FALSE;
+}
+
 static void HIDAPI_DriverLg4ff_HandleState(SDL_HIDAPI_Device *device,
                                                SDL_Joystick *joystick,
-                                               Uint8 *report_buf)
+                                               Uint8 *report_buf,
+                                               size_t report_size)
 {
     SDL_DriverLg4ff_Context *ctx = (SDL_DriverLg4ff_Context *)device->context;
-
     Uint8 hat = 0;
     Uint8 last_hat = 0;
+    int num_buttons = HIDAPI_DriverLg4ff_GetNumberOfButtons(device->product_id);
+    int bit_offset = 0;
     
     switch (device->product_id) {
         case USB_DEVICE_ID_LOGITECH_G29_WHEEL:
@@ -171,7 +391,7 @@ static void HIDAPI_DriverLg4ff_HandleState(SDL_HIDAPI_Device *device,
         case USB_DEVICE_ID_LOGITECH_G25_WHEEL:
         case USB_DEVICE_ID_LOGITECH_DFGT_WHEEL:
             hat = report_buf[0] & 0x0f;
-            old_hat = ctx->last_report_buf[0] 0x0f;
+            last_hat = ctx->last_report_buf[0] & 0x0f;
             break;
         case USB_DEVICE_ID_LOGITECH_DFP_WHEEL:
             hat = report_buf[3] >> 4;
@@ -180,6 +400,7 @@ static void HIDAPI_DriverLg4ff_HandleState(SDL_HIDAPI_Device *device,
         case USB_DEVICE_ID_LOGITECH_WHEEL:
             hat = report_buf[2] & 0x0F;
             last_hat = ctx->last_report_buf[2] & 0x0F;
+            break;
         default:
             SDL_assert(0);
     }
@@ -214,20 +435,135 @@ static void HIDAPI_DriverLg4ff_HandleState(SDL_HIDAPI_Device *device,
             case 8:
                 sdl_hat = SDL_HAT_CENTERED;
                 break;
-            // XXX do not assert out, in case hardware can report weird hat values
+            // do not assert out, in case hardware can report weird hat values
         }
         SDL_PrivateJoystickHat(joystick, 0, sdl_hat);
     }
 
+    switch (device->product_id) {
+        case USB_DEVICE_ID_LOGITECH_G29_WHEEL:
+        case USB_DEVICE_ID_LOGITECH_G27_WHEEL:
+        case USB_DEVICE_ID_LOGITECH_G25_WHEEL:
+        case USB_DEVICE_ID_LOGITECH_DFGT_WHEEL:
+            bit_offset = 4;
+            break;
+        case USB_DEVICE_ID_LOGITECH_DFP_WHEEL:
+            bit_offset = 14;
+            break;
+        case USB_DEVICE_ID_LOGITECH_WHEEL:
+            bit_offset = 0;
+            break;
+        default:
+            SDL_assert(0);
+    }
 
+    for (int i = 0;i < num_buttons;i++) {
+        int bit_num = bit_offset + i;
+        SDL_bool button_on = HIDAPI_DriverLg4ff_GetBit(report_buf, bit_num, report_size);
+        SDL_bool button_was_on = HIDAPI_DriverLg4ff_GetBit(ctx->last_report_buf, bit_num, report_size);
+        if(button_on != button_was_on){
+             SDL_PrivateJoystickButton(joystick, SDL_CONTROLLER_BUTTON_A + i, button_on ? SDL_PRESSED : SDL_RELEASED);
+        }
+    }
 
+    switch (device->product_id) {
+        case USB_DEVICE_ID_LOGITECH_G29_WHEEL:{
+            Uint16 x = *(Uint16 *)&report_buf[4];
+            Uint16 last_x = *(Uint16 *)&ctx->last_report_buf[4];
+            if (x != last_x) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_LEFTX, x - 32768);
+            }
+            if (report_buf[6] != ctx->last_report_buf[6]) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_TRIGGERLEFT, report_buf[6] * 257 - 32768);
+            }
+            if (report_buf[7] != ctx->last_report_buf[7]) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_TRIGGERRIGHT, report_buf[7] * 257 - 32768);
+            }
+            if (report_buf[8] != ctx->last_report_buf[8]) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_LEFTY, report_buf[8] * 257 - 32768);
+            }
+            break;
+        }
+        case USB_DEVICE_ID_LOGITECH_G27_WHEEL:
+        case USB_DEVICE_ID_LOGITECH_G25_WHEEL:{
+            Uint16 x = report_buf[4] << 6;
+            Uint16 last_x = ctx->last_report_buf[4] << 6;
+            x = x | report_buf[3] >> 2;
+            last_x = last_x | ctx->last_report_buf[3] >> 2;
+            if (x != last_x) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_LEFTX, x * 4 - 32768);
+            }
+            if (report_buf[5] != ctx->last_report_buf[5]) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_TRIGGERLEFT, report_buf[5] * 257 - 32768);
+            }
+            if (report_buf[6] != ctx->last_report_buf[6]) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_TRIGGERRIGHT, report_buf[6] * 257 - 32768);
+            }
+            if (report_buf[7] != ctx->last_report_buf[7]) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_LEFTY, report_buf[7] * 257 - 32768);
+            }
+            break;
+        }
+        case USB_DEVICE_ID_LOGITECH_DFGT_WHEEL:{
+            Uint16 x = report_buf[4];
+            Uint16 last_x = ctx->last_report_buf[4];
+            x = x | (report_buf[5] & 0x3F) << 8;
+            last_x = last_x | (ctx->last_report_buf[5] & 0x3F) << 8;
+            if (x != last_x) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_LEFTX, x * 4 - 32768);
+            }
+            if (report_buf[6] != ctx->last_report_buf[6]) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_LEFTY, report_buf[6] * 257 - 32768);
+            }
+            if (report_buf[7] != ctx->last_report_buf[7]) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_TRIGGERLEFT, report_buf[7] * 257 - 32768);
+            }
+            break;
+        }
+        case USB_DEVICE_ID_LOGITECH_DFP_WHEEL:{
+            Uint16 x = report_buf[0];
+            Uint16 last_x = ctx->last_report_buf[0];
+            x = x | (report_buf[1] & 0x3F) << 8;
+            last_x = last_x | (ctx->last_report_buf[1] & 0x3F) << 8;
+            if (x != last_x) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_LEFTX, x * 4 - 32768);
+            }
+            if (report_buf[5] != ctx->last_report_buf[5]) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_LEFTY, report_buf[5] * 257 - 32768);
+            }
+            if (report_buf[6] != ctx->last_report_buf[6]) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_TRIGGERRIGHT, report_buf[6] * 257 - 32768);
+            }
+            break;
+        }
+        case USB_DEVICE_ID_LOGITECH_WHEEL:{
+            if (report_buf[3] != ctx->last_report_buf[3]) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_LEFTX, report_buf[3] * 257 - 32768);
+            }
+            if (report_buf[4] != ctx->last_report_buf[4]) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_LEFTY, report_buf[4] * 257 - 32768);
+            }
+            if (report_buf[5] != ctx->last_report_buf[5]) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_TRIGGERLEFT, report_buf[5] * 257 - 32768);
+            }
+            if (report_buf[6] != ctx->last_report_buf[6]) {
+                SDL_PrivateJoystickAxis(joystick, SDL_CONTROLLER_AXIS_TRIGGERRIGHT, report_buf[7] * 257 - 32768);
+            }
+            break;
+        }
+        default:
+            SDL_assert(0);
+    }
+
+    SDL_memcpy(ctx->last_report_buf, report_buf, report_size);
 }
 
 static SDL_bool HIDAPI_DriverLg4ff_UpdateDevice(SDL_HIDAPI_Device *device)
 {
     SDL_Joystick *joystick = NULL;
     size_t r;
-    Uint8 report_buf[32];
+    Uint8 report_buf[32] = {0};
+    size_t report_size = 0;
 
     if (device->num_joysticks > 0) {
         joystick = SDL_JoystickFromInstanceID(device->joysticks[0]);
@@ -238,19 +574,20 @@ static SDL_bool HIDAPI_DriverLg4ff_UpdateDevice(SDL_HIDAPI_Device *device)
         return SDL_FALSE;
     }
 
-    SDL_memset(data, 0, sizeof(report_buf));
-
-    size_t report_size = 0;
     switch (device->product_id) {
         case USB_DEVICE_ID_LOGITECH_G29_WHEEL:
             report_size = 12;
             break;
         case USB_DEVICE_ID_LOGITECH_G27_WHEEL:
         case USB_DEVICE_ID_LOGITECH_G25_WHEEL:
+            report_size = 11;
+            break;
         case USB_DEVICE_ID_LOGITECH_DFGT_WHEEL:
         case USB_DEVICE_ID_LOGITECH_DFP_WHEEL:
-        case USB_DEVICE_ID_LOGITECH_WHEEL:
             report_size = 8;
+            break;
+        case USB_DEVICE_ID_LOGITECH_WHEEL:
+            report_size = 27;
             break;
         default:
             SDL_assert(0);
@@ -264,9 +601,11 @@ static SDL_bool HIDAPI_DriverLg4ff_UpdateDevice(SDL_HIDAPI_Device *device)
             HIDAPI_JoystickDisconnected(device, device->joysticks[0]);
             return SDL_FALSE;
         } else if (r == report_size) {
-            HIDAPI_DriverLg4ff_HandleState(device, joystick, report_buf);
+            HIDAPI_DriverLg4ff_HandleState(device, joystick, report_buf, report_size);
         }
     } while (r > 0);
+
+    // TODO run effect tick here, after wiring up haptic with hidapi
 
     return SDL_TRUE;
 }
@@ -277,21 +616,70 @@ static SDL_bool HIDAPI_DriverLg4ff_OpenJoystick(SDL_HIDAPI_Device *device, SDL_J
 
     // Initialize the joystick capabilities
     joystick->nhats = 1;
-    joystick->nbuttons = 20;
-    joystick->naxes = SDL_CONTROLLER_AXIS_MAX;
-
-    SDL_PrivateJoystickAddSensor(joystick, SDL_SENSOR_GYRO, update_rate_in_hz);
-    SDL_PrivateJoystickAddSensor(joystick, SDL_SENSOR_ACCEL, update_rate_in_hz);
+    joystick->nbuttons = HIDAPI_DriverLg4ff_GetNumberOfButtons(device->product_id);
+    switch(device->product_id){
+        case USB_DEVICE_ID_LOGITECH_G29_WHEEL:
+        case USB_DEVICE_ID_LOGITECH_G27_WHEEL:
+        case USB_DEVICE_ID_LOGITECH_G25_WHEEL:
+        case USB_DEVICE_ID_LOGITECH_WHEEL:
+            joystick->naxes = 4;
+            break;
+        case USB_DEVICE_ID_LOGITECH_DFGT_WHEEL:
+            joystick->naxes = 3;
+            break;
+        case USB_DEVICE_ID_LOGITECH_DFP_WHEEL:
+            joystick->naxes = 3;
+            break;
+        default:
+            SDL_assert(0);
+    }
 
     return SDL_TRUE;
 }
 
-/*
-  XXX
+static int HIDAPI_DriverLg4ff_RumbleJoystick(SDL_HIDAPI_Device *device, SDL_Joystick *joystick, Uint16 low_frequency_rumble, Uint16 high_frequency_rumble)
+{
+    return SDL_Unsupported();
+}
 
-  Once again the Linux driver checks between ffex and dfex on the usb
-  stack, not sure how one can check for that on hid.
-*/
+static int HIDAPI_DriverLg4ff_RumbleJoystickTriggers(SDL_HIDAPI_Device *device, SDL_Joystick *joystick, Uint16 left_rumble, Uint16 right_rumble)
+{
+    return SDL_Unsupported();
+}
+
+static Uint32 HIDAPI_DriverLg4ff_GetJoystickCapabilities(SDL_HIDAPI_Device *device, SDL_Joystick *joystick)
+{
+    return 0;
+}
+
+static int HIDAPI_DriverLg4ff_SetJoystickLED(SDL_HIDAPI_Device *device, SDL_Joystick *joystick, Uint8 red, Uint8 green, Uint8 blue)
+{
+    // TODO
+    return SDL_Unsupported();
+}
+
+static int HIDAPI_DriverLg4ff_SendJoystickEffect(SDL_HIDAPI_Device *device, SDL_Joystick *joystick, const void *data, int size)
+{
+    // effects go to the haptic interface instead
+    return SDL_Unsupported();
+}
+
+static int HIDAPI_DriverLg4ff_SetSensorsEnabled(SDL_HIDAPI_Device *device, SDL_Joystick *joystick, SDL_bool enabled)
+{
+    // On steam deck, sensors are enabled by default. Nothing to do here.
+    return SDL_Unsupported();
+}
+
+static void HIDAPI_DriverLg4ff_CloseJoystick(SDL_HIDAPI_Device *device, SDL_Joystick *joystick)
+{
+    // nothing to do here, but remember to stop effects on haptics close, when implemented
+}
+
+static void HIDAPI_DriverLg4ff_FreeDevice(SDL_HIDAPI_Device *device)
+{
+    // device context is freed in SDL_hidapijoystick.c
+}
+
 
 SDL_HIDAPI_DeviceDriver SDL_HIDAPI_DriverLg4ff = {
     SDL_HINT_JOYSTICK_HIDAPI_LG4FF,
@@ -303,16 +691,16 @@ SDL_HIDAPI_DeviceDriver SDL_HIDAPI_DriverLg4ff = {
     HIDAPI_DriverLg4ff_InitDevice,
     HIDAPI_DriverLg4ff_GetDevicePlayerIndex,
     HIDAPI_DriverLg4ff_SetDevicePlayerIndex,
-    HIDAPI_DriverSteamDeck_UpdateDevice,
-    HIDAPI_DriverSteamDeck_OpenJoystick,
-    HIDAPI_DriverSteamDeck_RumbleJoystick,
-    HIDAPI_DriverSteamDeck_RumbleJoystickTriggers,
-    HIDAPI_DriverSteamDeck_GetJoystickCapabilities,
-    HIDAPI_DriverSteamDeck_SetJoystickLED,
-    HIDAPI_DriverSteamDeck_SendJoystickEffect,
-    HIDAPI_DriverSteamDeck_SetSensorsEnabled,
-    HIDAPI_DriverSteamDeck_CloseJoystick,
-    HIDAPI_DriverSteamDeck_FreeDevice,
+    HIDAPI_DriverLg4ff_UpdateDevice,
+    HIDAPI_DriverLg4ff_OpenJoystick,
+    HIDAPI_DriverLg4ff_RumbleJoystick,
+    HIDAPI_DriverLg4ff_RumbleJoystickTriggers,
+    HIDAPI_DriverLg4ff_GetJoystickCapabilities,
+    HIDAPI_DriverLg4ff_SetJoystickLED,
+    HIDAPI_DriverLg4ff_SendJoystickEffect,
+    HIDAPI_DriverLg4ff_SetSensorsEnabled,
+    HIDAPI_DriverLg4ff_CloseJoystick,
+    HIDAPI_DriverLg4ff_FreeDevice,
 };
 
 
