@@ -20,7 +20,7 @@
 */
 
 /*
-  This driver is heavily based on https://github.com/berarma/new-lg4ff
+  All hid command sent are based on https://github.com/berarma/new-lg4ff
 */
 
 #include "../../SDL_internal.h"
@@ -679,10 +679,63 @@ static Uint32 HIDAPI_DriverLg4ff_GetJoystickCapabilities(SDL_HIDAPI_Device *devi
     return 0;
 }
 
+static int HIDAPI_DriverLg4ff_SendLedCommand(SDL_HIDAPI_Device *device, Uint8 state)
+{
+	Uint8 cmd[7];
+    Uint8 led_state = 0;
+
+    switch (state) {
+        case 0:
+            led_state = 0;
+            break;
+        case 1:
+            led_state = 1;
+            break;
+        case 2:
+            led_state = 3;
+            break;
+        case 3:
+            led_state = 7;
+            break;
+        case 4:
+            led_state = 15;
+            break;
+        case 5:
+            led_state = 31;
+            break;
+        default:
+            SDL_assert(0);
+    }
+
+	cmd[0] = 0xf8;
+	cmd[1] = 0x12;
+	cmd[2] = led_state;
+	cmd[3] = 0x00;
+	cmd[4] = 0x00;
+	cmd[5] = 0x00;
+	cmd[6] = 0x00;
+
+	return SDL_hid_write(device->dev, cmd, sizeof(cmd)) > 0 ? 0 : -1;
+}
+
 static int HIDAPI_DriverLg4ff_SetJoystickLED(SDL_HIDAPI_Device *device, SDL_Joystick *joystick, Uint8 red, Uint8 green, Uint8 blue)
 {
-    // TODO
-    return SDL_Unsupported();
+    int max_led = red;
+
+    // only g27/g29, and g923 when supported is added
+    if (device->product_id != USB_DEVICE_ID_LOGITECH_G29_WHEEL &&
+    device->product_id != USB_DEVICE_ID_LOGITECH_G27_WHEEL) {
+        return SDL_Unsupported();
+    }
+
+    if (green > max_led) {
+        max_led = green;
+    }
+    if (blue > max_led) {
+        max_led = blue;
+    }
+
+    return HIDAPI_DriverLg4ff_SendLedCommand(device, (5 * max_led) / 255);
 }
 
 static int HIDAPI_DriverLg4ff_SendJoystickEffect(SDL_HIDAPI_Device *device, SDL_Joystick *joystick, const void *data, int size)
