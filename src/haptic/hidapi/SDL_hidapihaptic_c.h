@@ -1,0 +1,71 @@
+/*
+  Simple DirectMedia Layer
+  Copyright (C) 2024 Katharine Chui <katharine.chui@gmail.com>
+
+  This software is provided 'as-is', without any express or implied
+  warranty.  In no event will the authors be held liable for any damages
+  arising from the use of this software.
+
+  Permission is granted to anyone to use this software for any purpose,
+  including commercial applications, and to alter it and redistribute it
+  freely, subject to the following restrictions:
+
+  1. The origin of this software must not be misrepresented; you must not
+     claim that you wrote the original software. If you use this software
+     in a product, an acknowledgment in the product documentation would be
+     appreciated but is not required.
+  2. Altered source versions must be plainly marked as such, and must not be
+     misrepresented as being the original software.
+  3. This notice may not be removed or altered from any source distribution.
+*/
+
+#ifndef SDL_joystick_c_h_
+#define SDL_joystick_c_h_
+
+#include "../../SDL_internal.h"
+
+#include "SDL_haptic.h"
+#include "SDL_joystick.h"
+#include "../SDL_syshaptic.h"
+
+struct SDL_HIDAPI_HapticDriver;
+typedef struct SDL_HIDAPI_HapticDevice
+{
+    SDL_Joystick *joystick; /* related hidapi joystick */
+    SDL_HIDAPI_HapticDriver *driver; /* driver to use */
+    void *ctx; /* driver specific context */
+} SDL_HIDAPI_HapticDevice;
+
+typedef struct SDL_HIDAPI_HapticDriver
+{
+    SDL_bool (*JoystickSupported)(SDL_Joystick *joystick); /* return SDL_TRUE if haptic can be opened from the joystick */
+    void *(*Open)(SDL_Joystick *joystick); / /* returns a driver context, or null if it cannot be allocated */
+  
+    /* functions below need to handle the possibility of a null joystick instance, indicating the absence of the joystick */
+    void (*Close)(SDL_HIDAPI_HapticDevice *device); /* cleanup resources allocated during Open */
+  
+    /* below mirror SDL_haptic.h effect interfaces */
+    int (*NumEffects)(SDL_HIDAPI_HapticDevice *device); /* returns supported number of effects the device can store */
+    int (*NumEffectsPlaying)(SDL_HIDAPI_HapticDevice *device); /* returns supported number of effects the device can play concurrently */
+    unsigned int (*Query)(SDL_HIDAPI_HapticDevice *device); /* returns supported effects in a bitmask */
+    int (*NumAxes)(SDL_HIDAPI_HapticDevice *device); /* returns the number of haptic axes */
+    int (*EffectSupported)(SDL_HIDAPI_HapticDevice *device, SDL_HapticEffect *effect); /* SDL_TRUE if an effect is supported, SDL_FALSE if not, negative number on error */
+    int (*NewEffect)(SDL_HIDAPI_HapticDevice *device, SDL_HapticEffect *effect); /* returns effect id if created correctly, negative number on error */
+    int (*UpdateEffect)(SDL_HIDAPI_HapticDevice *device, int id, SDL_HapticEffect *data); /* returns 0 on success, negative number on error */
+    int (*RunEffect)(SDL_HIDAPI_HapticDevice *device, int id, Uint32 iterations); /* returns 0 on success, negative number on error */
+    int (*StopEffect)(SDL_HIDAPI_HapticDevice *device, int id); /* returns 0 on success, negative number on error */
+    int (*DestroyEffect)(SDL_HIDAPI_HapticDevice *device, int id); /* returns 0 on success, negative number on error */
+    int (*GetEffectStatus)(SDL_HIDAPI_HapticDevice *device, int id); /* returns 0 if not playing, 1 if playing, negative number on error */
+    int (*SetGain)(SDL_HIDAPI_HapticDevice *device, int gain); /* gain 0 - 100, returns 0 on success, negative number on error */
+    int (*SetAutocenter)(SDL_HIDAPI_HapticDevice *device, int autocenter); /* gain 0 - 100, returns 0 on success, negative number on error */
+    int (*Pause)(SDL_HIDAPI_HapticDevice *device); /* returns 0 on success, negative number on error */
+    int (*Unpause)(SDL_HIDAPI_HapticDevice *device); /* returns 0 on success, negative number on error */
+    int (*StopAll)(SDL_HIDAPI_HapticDevice *device); /* returns 0 on success, negative number on error */
+    int (*RumbleSupported)(SDL_Haptic * haptic); /* returns SDL_TRUE if supported, SDL_FALSE otherwise */
+    int (*RumbleInit)(SDL_Haptic * haptic); /* returns 0 on success, negative number on error */
+    int (*RumblePlay)(SDL_Haptic * haptic, float strength, Uint32 length); /* returns 0 on success, negative number on error */
+    int (*RumbleStop)(SDL_Haptic * haptic); /* returns 0 on success, negative number on error */
+} SDL_HIDAPI_HapticDriver;
+
+
+#endif //SDL_joystick_c_h_
