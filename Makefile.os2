@@ -94,7 +94,7 @@ SRCS+= SDL_systimer.c
 SRCS+= SDL_sysloadso.c
 SRCS+= SDL_sysfilesystem.c
 SRCS+= SDL_os2joystick.c SDL_syshaptic.c SDL_sysjoystick.c SDL_virtualjoystick.c
-SRCS+= SDL_hidapijoystick.c SDL_hidapi_rumble.c SDL_hidapi_combined.c SDL_hidapi_gamecube.c SDL_hidapi_luna.c SDL_hidapi_ps3.c SDL_hidapi_ps4.c SDL_hidapi_ps5.c SDL_hidapi_shield.c SDL_hidapi_stadia.c SDL_hidapi_switch.c SDL_hidapi_wii.c SDL_hidapi_xbox360.c SDL_hidapi_xbox360w.c SDL_hidapi_xboxone.c SDL_hidapi_steam.c SDL_hidapi_steamdeck.c SDL_steam_virtual_gamepad.c SDL_hidapi_lg4ff.c
+SRCS+= SDL_hidapijoystick.c SDL_hidapihaptic.c SDL_hidapi_rumble.c SDL_hidapi_combined.c SDL_hidapi_gamecube.c SDL_hidapi_luna.c SDL_hidapi_ps3.c SDL_hidapi_ps4.c SDL_hidapi_ps5.c SDL_hidapi_shield.c SDL_hidapi_stadia.c SDL_hidapi_switch.c SDL_hidapi_wii.c SDL_hidapi_xbox360.c SDL_hidapi_xbox360w.c SDL_hidapi_xboxone.c SDL_hidapi_steam.c SDL_hidapi_steamdeck.c SDL_steam_virtual_gamepad.c SDL_hidapi_lg4ff.c
 SRCS+= SDL_dummyaudio.c SDL_diskaudio.c
 SRCS+= SDL_nullvideo.c SDL_nullframebuffer.c SDL_nullevents.c
 SRCS+= SDL_dummysensor.c
@@ -120,7 +120,7 @@ OBJS = $(SRCS:.c=.obj)
 .c: ./src/haptic/dummy;./src/joystick/dummy;./src/joystick/virtual;./src/audio/dummy;./src/video/dummy;./src/sensor/dummy;
 .c: ./src/core/os2;./src/audio/os2;./src/loadso/os2;./src/filesystem/os2;./src/joystick/os2;./src/thread/os2;./src/timer/os2;./src/video/os2;
 .c: ./src/core/os2/geniconv;
-.c: ./src/locale/;./src/locale/unix;./src/misc;./src/misc/dummy;./src/joystick/hidapi;./src/hidapi
+.c: ./src/locale/;./src/locale/unix;./src/misc;./src/misc/dummy;./src/joystick/hidapi;./src/haptic/hidapi;./src/hidapi
 
 all: $(DLLFILE) $(LIBFILE) $(TLIB) .symbolic
 
