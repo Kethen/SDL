@@ -130,9 +130,9 @@ static SDL_bool HIDAPI_DriverLg4ff_IsSupportedDevice(
 {
     /*
       TODO
-      
+
       Is it possible to identify native mode from hid? On the Linux kernel
-      driver that is done by checking with the usb stack, more specifically 
+      driver that is done by checking with the usb stack, more specifically
       bcdDevice on the usb descriptor
 
       If a way is found to probe for native mode on the HID layer, this function
@@ -155,13 +155,13 @@ static SDL_bool HIDAPI_DriverLg4ff_SetRange(SDL_HIDAPI_Device *device, int range
     Uint8 cmd[7] = {0};
     int ret = 0;
 
-    if(range < 40){
+    if (range < 40) {
         range = 40;
     }
-    if(range > 900){
+    if (range > 900) {
         range = 900;
     }
-    
+
     switch (device->product_id) {
         case USB_DEVICE_ID_LOGITECH_G29_WHEEL:
         case USB_DEVICE_ID_LOGITECH_G27_WHEEL:
@@ -249,15 +249,15 @@ static SDL_bool HIDAPI_DriverLg4ff_SetAutoCenter(SDL_HIDAPI_Device *device, int 
     Uint8 cmd[7] = {0};
     int ret;
 
-    if(gain < 0){
+    if (gain < 0) {
         gain = 0;
     }
-    if(gain > 65535){
+    if (gain > 65535) {
         gain = 65535;
     }
 
 #if 0
-    if(is_ffex){
+    if (is_ffex) {
         gain = gain * 90 / 65535;
 
         cmd[0] = 0xfe;
@@ -281,20 +281,20 @@ static SDL_bool HIDAPI_DriverLg4ff_SetAutoCenter(SDL_HIDAPI_Device *device, int 
         cmd[0] = 0xf5;
 
         ret = SDL_hid_write(device->dev, cmd, sizeof(cmd));
-        if(ret == -1){
+        if (ret == -1) {
             return SDL_FALSE;
         }
 
-        if(gain == 0){
+        if (gain == 0) {
             return SDL_TRUE;
         }
 
         // set strength
 
-        if(gain <= 0xaaaa){
+        if (gain <= 0xaaaa) {
             expand_a = 0x0c * gain;
             expand_b = 0x80 * gain;
-        }else{
+        } else {
             expand_a = (0x0c * 0xaaaa) + 0x06 * (gain - 0xaaaa);
             expand_b = (0x80 * 0xaaaa) + 0xff * (gain - 0xaaaa);
         }
@@ -308,7 +308,7 @@ static SDL_bool HIDAPI_DriverLg4ff_SetAutoCenter(SDL_HIDAPI_Device *device, int 
         cmd[4] = expand_b / 0xaaaa;
 
         ret = SDL_hid_write(device->dev, cmd, sizeof(cmd));
-        if(ret == -1){
+        if (ret == -1) {
             return SDL_FALSE;
         }
 
@@ -317,7 +317,7 @@ static SDL_bool HIDAPI_DriverLg4ff_SetAutoCenter(SDL_HIDAPI_Device *device, int 
         cmd[0] = 0x14;
 
         ret = SDL_hid_write(device->dev, cmd, sizeof(cmd));
-        if(ret == -1){
+        if (ret == -1) {
             return SDL_FALSE;
         }
     }
@@ -366,7 +366,7 @@ static SDL_bool HIDAPI_DriverLg4ff_GetBit(const Uint8 *buf, int bit_num, int buf
     int byte_offset = bit_num / 8;
     int local_bit = bit_num % 8;
     Uint8 mask = 1 << local_bit;
-    if(byte_offset >= buf_len){
+    if (byte_offset >= buf_len) {
         SDL_assert(0);
     }
     return (buf[byte_offset] & mask) ? SDL_TRUE : SDL_FALSE;
@@ -382,7 +382,7 @@ static SDL_bool HIDAPI_DriverLg4ff_HandleState(SDL_HIDAPI_Device *device,
     Uint8 last_hat = 0;
     int num_buttons = HIDAPI_DriverLg4ff_GetNumberOfButtons(device->product_id);
     int bit_offset = 0;
-    
+
     SDL_bool state_changed;
 
     switch (device->product_id) {
@@ -681,7 +681,7 @@ static Uint32 HIDAPI_DriverLg4ff_GetJoystickCapabilities(SDL_HIDAPI_Device *devi
 
 static int HIDAPI_DriverLg4ff_SendLedCommand(SDL_HIDAPI_Device *device, Uint8 state)
 {
-	Uint8 cmd[7];
+    Uint8 cmd[7];
     Uint8 led_state = 0;
 
     switch (state) {
@@ -707,15 +707,15 @@ static int HIDAPI_DriverLg4ff_SendLedCommand(SDL_HIDAPI_Device *device, Uint8 st
             SDL_assert(0);
     }
 
-	cmd[0] = 0xf8;
-	cmd[1] = 0x12;
-	cmd[2] = led_state;
-	cmd[3] = 0x00;
-	cmd[4] = 0x00;
-	cmd[5] = 0x00;
-	cmd[6] = 0x00;
+    cmd[0] = 0xf8;
+    cmd[1] = 0x12;
+    cmd[2] = led_state;
+    cmd[3] = 0x00;
+    cmd[4] = 0x00;
+    cmd[5] = 0x00;
+    cmd[6] = 0x00;
 
-	return SDL_hid_write(device->dev, cmd, sizeof(cmd)) > 0 ? 0 : -1;
+    return SDL_hid_write(device->dev, cmd, sizeof(cmd)) > 0 ? 0 : -1;
 }
 
 static int HIDAPI_DriverLg4ff_SetJoystickLED(SDL_HIDAPI_Device *device, SDL_Joystick *joystick, Uint8 red, Uint8 green, Uint8 blue)
