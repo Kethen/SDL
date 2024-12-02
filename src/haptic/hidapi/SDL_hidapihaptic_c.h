@@ -22,11 +22,12 @@
 #ifndef SDL_joystick_c_h_
 #define SDL_joystick_c_h_
 
-#include "../../SDL_internal.h"
-
 #include "SDL_haptic.h"
 #include "SDL_joystick.h"
 #include "../SDL_syshaptic.h"
+#include "../../joystick/SDL_joystick_c.h" // accessing _SDL_Joystick and _SDL_Joystick
+
+#define SDL_HAPTIC_HIDAPI_LG4FF
 
 struct SDL_HIDAPI_HapticDriver;
 typedef struct SDL_HIDAPI_HapticDevice
@@ -39,10 +40,10 @@ typedef struct SDL_HIDAPI_HapticDevice
 typedef struct SDL_HIDAPI_HapticDriver
 {
     SDL_bool (*JoystickSupported)(SDL_Joystick *joystick); /* return SDL_TRUE if haptic can be opened from the joystick */
-    void *(*Open)(SDL_Joystick *joystick); / /* returns a driver context, or null if it cannot be allocated */
+    void *(*Open)(SDL_Joystick *joystick); / /* returns a driver context allocated with SDL_malloc, or null if it cannot be allocated */
   
     /* functions below need to handle the possibility of a null joystick instance, indicating the absence of the joystick */
-    void (*Close)(SDL_HIDAPI_HapticDevice *device); /* cleanup resources allocated during Open */
+    void (*Close)(SDL_HIDAPI_HapticDevice *device); /* cleanup resources allocated during Open, do NOT free driver context created in Open */
   
     /* below mirror SDL_haptic.h effect interfaces */
     int (*NumEffects)(SDL_HIDAPI_HapticDevice *device); /* returns supported number of effects the device can store */
@@ -50,11 +51,11 @@ typedef struct SDL_HIDAPI_HapticDriver
     unsigned int (*Query)(SDL_HIDAPI_HapticDevice *device); /* returns supported effects in a bitmask */
     int (*NumAxes)(SDL_HIDAPI_HapticDevice *device); /* returns the number of haptic axes */
     int (*EffectSupported)(SDL_HIDAPI_HapticDevice *device, SDL_HapticEffect *effect); /* SDL_TRUE if an effect is supported, SDL_FALSE if not, negative number on error */
-    int (*NewEffect)(SDL_HIDAPI_HapticDevice *device, SDL_HapticEffect *effect); /* returns effect id if created correctly, negative number on error */
+    int (*NewEffect)(SDL_HIDAPI_HapticDevice *device, SDL_HapticEffect *data); /* returns effect id if created correctly, negative number on error */
     int (*UpdateEffect)(SDL_HIDAPI_HapticDevice *device, int id, SDL_HapticEffect *data); /* returns 0 on success, negative number on error */
     int (*RunEffect)(SDL_HIDAPI_HapticDevice *device, int id, Uint32 iterations); /* returns 0 on success, negative number on error */
     int (*StopEffect)(SDL_HIDAPI_HapticDevice *device, int id); /* returns 0 on success, negative number on error */
-    int (*DestroyEffect)(SDL_HIDAPI_HapticDevice *device, int id); /* returns 0 on success, negative number on error */
+    void (*DestroyEffect)(SDL_HIDAPI_HapticDevice *device, int id); /* returns 0 on success, negative number on error */
     int (*GetEffectStatus)(SDL_HIDAPI_HapticDevice *device, int id); /* returns 0 if not playing, 1 if playing, negative number on error */
     int (*SetGain)(SDL_HIDAPI_HapticDevice *device, int gain); /* gain 0 - 100, returns 0 on success, negative number on error */
     int (*SetAutocenter)(SDL_HIDAPI_HapticDevice *device, int autocenter); /* gain 0 - 100, returns 0 on success, negative number on error */
@@ -67,5 +68,6 @@ typedef struct SDL_HIDAPI_HapticDriver
     int (*RumbleStop)(SDL_Haptic * haptic); /* returns 0 on success, negative number on error */
 } SDL_HIDAPI_HapticDriver;
 
+extern SDL_HIDAPI_HapticDriver SDL_HIDAPI_HapticDriverLg4ff;
 
 #endif //SDL_joystick_c_h_
