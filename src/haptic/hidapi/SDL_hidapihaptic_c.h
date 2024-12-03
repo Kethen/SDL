@@ -19,17 +19,20 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
-#ifndef SDL_joystick_c_h_
-#define SDL_joystick_c_h_
+#include "../../SDL_internal.h"
+
+#ifndef SDL_hidapihaptic_c_h_
+#define SDL_hidapihaptic_c_h_
 
 #include "SDL_haptic.h"
 #include "SDL_joystick.h"
 #include "../SDL_syshaptic.h"
-#include "../../joystick/SDL_joystick_c.h" // accessing _SDL_Joystick and _SDL_Joystick
+#include "../../joystick/SDL_joystick_c.h" // accessing _SDL_JoystickDriver
+#include "../../joystick/SDL_sysjoystick.h" // accessing _SDL_Joystick
 
 #define SDL_HAPTIC_HIDAPI_LG4FF
 
-struct SDL_HIDAPI_HapticDriver;
+typedef struct SDL_HIDAPI_HapticDriver SDL_HIDAPI_HapticDriver;
 typedef struct SDL_HIDAPI_HapticDevice
 {
     SDL_Joystick *joystick; /* related hidapi joystick */
@@ -37,10 +40,10 @@ typedef struct SDL_HIDAPI_HapticDevice
     void *ctx; /* driver specific context */
 } SDL_HIDAPI_HapticDevice;
 
-typedef struct SDL_HIDAPI_HapticDriver
+struct SDL_HIDAPI_HapticDriver
 {
     SDL_bool (*JoystickSupported)(SDL_Joystick *joystick); /* return SDL_TRUE if haptic can be opened from the joystick */
-    void *(*Open)(SDL_Joystick *joystick); / /* returns a driver context allocated with SDL_malloc, or null if it cannot be allocated */
+    void *(*Open)(SDL_Joystick *joystick); /* returns a driver context allocated with SDL_malloc, or null if it cannot be allocated */
   
     /* functions below need to handle the possibility of a null joystick instance, indicating the absence of the joystick */
     void (*Close)(SDL_HIDAPI_HapticDevice *device); /* cleanup resources allocated during Open, do NOT free driver context created in Open */
@@ -62,11 +65,7 @@ typedef struct SDL_HIDAPI_HapticDriver
     int (*Pause)(SDL_HIDAPI_HapticDevice *device); /* returns 0 on success, negative number on error */
     int (*Unpause)(SDL_HIDAPI_HapticDevice *device); /* returns 0 on success, negative number on error */
     int (*StopAll)(SDL_HIDAPI_HapticDevice *device); /* returns 0 on success, negative number on error */
-    int (*RumbleSupported)(SDL_Haptic * haptic); /* returns SDL_TRUE if supported, SDL_FALSE otherwise */
-    int (*RumbleInit)(SDL_Haptic * haptic); /* returns 0 on success, negative number on error */
-    int (*RumblePlay)(SDL_Haptic * haptic, float strength, Uint32 length); /* returns 0 on success, negative number on error */
-    int (*RumbleStop)(SDL_Haptic * haptic); /* returns 0 on success, negative number on error */
-} SDL_HIDAPI_HapticDriver;
+};
 
 extern SDL_HIDAPI_HapticDriver SDL_HIDAPI_HapticDriverLg4ff;
 
