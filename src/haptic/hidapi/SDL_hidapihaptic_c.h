@@ -35,6 +35,7 @@
 typedef struct SDL_HIDAPI_HapticDriver SDL_HIDAPI_HapticDriver;
 typedef struct SDL_HIDAPI_HapticDevice
 {
+    SDL_Haptic *haptic; /* related haptic ref */
     SDL_Joystick *joystick; /* related hidapi joystick */
     SDL_HIDAPI_HapticDriver *driver; /* driver to use */
     void *ctx; /* driver specific context */

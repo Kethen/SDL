@@ -274,13 +274,6 @@ SDL_Haptic *SDL_HapticOpenFromJoystick(SDL_Joystick *joystick)
     SDL_Haptic *haptic;
     SDL_Haptic *hapticlist;
 
-    /* Make sure there is room. */
-    if (SDL_NumHaptics() <= 0) {
-        SDL_SetError("Haptic: There are %d haptic devices available",
-                     SDL_NumHaptics());
-        return NULL;
-    }
-
     SDL_LockJoysticks();
     {
         #ifdef SDL_JOYSTICK_HIDAPI
@@ -296,7 +289,16 @@ SDL_Haptic *SDL_HapticOpenFromJoystick(SDL_Joystick *joystick)
 
         #ifdef SDL_JOYSTICK_HIDAPI
         hidapi_joystick = SDL_HIDAPI_JoystickIsHaptic(joystick);
+        if (!hidapi_joystick)
         #endif //SDL_JOYSTICK_HIDAPI
+        /* Make sure there is room. */
+            {
+            if (SDL_NumHaptics() <= 0) {
+                SDL_SetError("Haptic: There are %d haptic devices available",
+                            SDL_NumHaptics());
+                return NULL;
+            }
+        }
 
         /* Joystick must be haptic */
         #ifdef SDL_JOYSTICK_HIDAPI
@@ -385,18 +387,20 @@ void SDL_HapticClose(SDL_Haptic *haptic)
         return;
     }
 
-    /* Close it, properly removing effects if needed */
-    for (i = 0; i < haptic->neffects; i++) {
-        if (haptic->effects[i].hweffect != NULL) {
-            SDL_HapticDestroyEffect(haptic, i);
-        }
-    }
     #ifdef SDL_JOYSTICK_HIDAPI
     if (SDL_HIDAPI_HapticIsHidapi(haptic))
         SDL_HIDAPI_HapticClose(haptic);
     else
     #endif //SDL_JOYSTICK_HIDAPI
+    {
+        /* Close it, properly removing effects if needed */
+        for (i = 0; i < haptic->neffects; i++) {
+            if (haptic->effects[i].hweffect != NULL) {
+                SDL_HapticDestroyEffect(haptic, i);
+            }
+        }
         SDL_SYS_HapticClose(haptic);
+    }
 
     /* Remove from the list */
     hapticlist = SDL_haptics;
@@ -561,16 +565,16 @@ int SDL_HapticUpdateEffect(SDL_Haptic *haptic, int effect,
         return -1;
     }
 
-    /* Can't change type dynamically. */
-    if (data->type != haptic->effects[effect].effect.type) {
-        return SDL_SetError("Haptic: Updating effect type is illegal.");
-    }
-
     #ifdef SDL_JOYSTICK_HIDAPI
     if (SDL_HIDAPI_HapticIsHidapi(haptic)) {
         return SDL_HIDAPI_HapticUpdateEffect(haptic, effect, data);
     }
     #endif //SDL_JOYSTICK_HIDAPI
+
+    /* Can't change type dynamically. */
+    if (data->type != haptic->effects[effect].effect.type) {
+        return SDL_SetError("Haptic: Updating effect type is illegal.");
+    }
 
     /* Updates the effect */
     if (SDL_SYS_HapticUpdateEffect(haptic, &haptic->effects[effect], data) <
