@@ -1221,6 +1221,7 @@ HID_API_EXPORT hid_device * HID_API_CALL hid_open_path(const char *path)
 	if (dev->output_report_length > 512) {
 		dev->use_hid_write_output_report = !IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN8 ), LOBYTE( _WIN32_WINNT_WIN8 ), 0 );
 	}
+	dev->use_hid_write_output_report = TRUE;
 
 end_of_function:
 	free(interface_path);

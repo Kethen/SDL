@@ -110,6 +110,11 @@ static void HIDAPI_DriverLg4ff_UnregisterHints(SDL_HintCallback callback, void *
 
 static bool HIDAPI_DriverLg4ff_IsEnabled(void)
 {
+	//#ifdef SDL_PLATFORM_WIN32
+	//bool default = false;
+	//#else
+	//bool default = SDL_GetHintBoolean(SDL_HINT_JOYSTICK_HIDAPI, SDL_HIDAPI_DEFAULT);
+	//#endif
     bool enabled = SDL_GetHintBoolean(SDL_HINT_JOYSTICK_HIDAPI_LG4FF,
                               SDL_GetHintBoolean(SDL_HINT_JOYSTICK_HIDAPI, SDL_HIDAPI_DEFAULT));
 
